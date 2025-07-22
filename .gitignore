@@ -1,0 +1,71 @@
+# Typical C++ .gitignore
+# Build artifacts
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.out
+*.a
+*.lib
+*.dylib
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+# Makefile
+build/
+bin/*
+
+# Visual Studio
+*.vcxproj*
+*.sln
+*.user
+*.opensdf
+*.sdf
+*.ipch
+*.pdb
+*.idb
+*.class
+*.psess
+*.vsp
+*.vspscc
+*.vssscc
+*.cache
+*.log
+*.tlog
+*.lastbuildstate
+*.db
+*.suo
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+*.xcuserstate
+*.xcuserdata
+*.xcconfig
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# Qt
+*.pro.user
+*.qbs.user
+*.moc
+*.qrc
+*.rcc
+
+# Other
+*.swp
+*.swo
+*.tmp
+*.bak
+*.DS_Store
+
+# Miniaudio generated files
+miniaudio/
