@@ -1,5 +1,6 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
+#include <MPMCQueue.h>
 
 #include <iostream>
 #include <random>
@@ -9,6 +10,7 @@
 #include <termios.h>
 #include <thread>
 
+#include <Commands.h>
 #include <NoiseGenerator.h>
 #include <WhiteNoise.h>
 #include <PinkNoise.h>
@@ -16,17 +18,9 @@
 #include <Raindrop.h>
 #include <Mixer.h>
 
-enum class PlayMode
-{
-  WHITE,
-  PINK,
-  BROWN,
-  RAIN,
-  QUIT
-};
-
 struct SharedState
 {
+  rigtorp::MPMCQueue<Command> command_queue{128};
   Mixer mixer;
 };
 
@@ -54,15 +48,22 @@ void set_unbuffered_input()
   tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 }
 
-// This function runs on a separate thread and just waits for keyboard input.
-void input_thread_func(std::atomic<char> &last_key)
+void input_thread_func(rigtorp::MPMCQueue<Command> &queue)
 {
   while (true)
   {
     char c = getchar();
-    last_key.store(c);
-    if (c == 'q')
+    if (c == 'w')
+      queue.push({AppState::WHITE});
+    else if (c == 'p')
+      queue.push({AppState::PINK});
+    else if (c == 'b')
+      queue.push({AppState::BROWN});
+    else if (c == 'r')
+      queue.push({AppState::RAIN});
+    else if (c == 'q')
     {
+      queue.push({AppState::QUIT});
       break;
     }
   }
@@ -76,15 +77,14 @@ int main()
 
   int channels = 2;
   int sample_rate = 48000;
-  PlayMode current_mode = PlayMode::PINK;
+  AppState current_mode = AppState::PINK;
   std::atomic<char> last_key_pressed(0);
 
   std::minstd_rand timing_rng(std::random_device{}());
   // Avg. 10 loops between drops, with a standard deviation of 4 loops
   std::normal_distribution<float> distribution(3.0f, 4.0f);
-  int loops_until_next_drop = distribution(timing_rng);
 
-  std::thread input_thread(input_thread_func, std::ref(last_key_pressed));
+  std::thread input_thread(input_thread_func, std::ref(state.command_queue));
 
   // std::make_unique is the modern C++ way to create a unique_ptr.
   state.mixer.add_source(std::make_unique<PinkNoiseGenerator>());
@@ -114,47 +114,43 @@ int main()
 
   set_unbuffered_input();
 
-  while (current_mode != PlayMode::QUIT)
-  {
-    char key = last_key_pressed.exchange(0); // Get the last key and reset it
+  int loops_until_next_drop = distribution(timing_rng);
 
-    if (key)
+  Command cmd;
+  while (current_mode != AppState::QUIT)
+  {
+    if (state.command_queue.try_pop(cmd))
     {
-      if (key == 'w' && current_mode != PlayMode::WHITE)
+      if (cmd.state != current_mode)
       {
-        current_mode = PlayMode::WHITE;
+        current_mode = cmd.state;
         state.mixer.clear_sources();
-        state.mixer.add_source(std::make_unique<WhiteNoiseGenerator>());
-        std::cout << "Switched to: White Noise" << std::endl;
-      }
-      else if (key == 'p' && current_mode != PlayMode::PINK)
-      {
-        current_mode = PlayMode::PINK;
-        state.mixer.clear_sources();
-        state.mixer.add_source(std::make_unique<PinkNoiseGenerator>());
-        std::cout << "Switched to: Pink Noise" << std::endl;
-      }
-      else if (key == 'b' && current_mode != PlayMode::BROWN)
-      {
-        current_mode = PlayMode::BROWN;
-        state.mixer.clear_sources();
-        state.mixer.add_source(std::make_unique<BrownNoiseGenerator>());
-        std::cout << "Switched to: Brown Noise" << std::endl;
-      }
-      else if (key == 'r' && current_mode != PlayMode::RAIN)
-      {
-        current_mode = PlayMode::RAIN;
-        state.mixer.clear_sources();
-        state.mixer.add_source(std::make_unique<PinkNoiseGenerator>());
-        std::cout << "Switched to: Rain Storm" << std::endl;
-      }
-      else if (key == 'q')
-      {
-        current_mode = PlayMode::QUIT;
+
+        switch (current_mode)
+        {
+        case AppState::WHITE:
+          state.mixer.add_source(std::make_unique<WhiteNoiseGenerator>());
+          std::cout << "Switched to: White Noise" << std::endl;
+          break;
+        case AppState::PINK:
+          state.mixer.add_source(std::make_unique<PinkNoiseGenerator>());
+          std::cout << "Switched to: Pink Noise" << std::endl;
+          break;
+        case AppState::BROWN:
+          state.mixer.add_source(std::make_unique<BrownNoiseGenerator>());
+          std::cout << "Switched to: Brown Noise" << std::endl;
+          break;
+        case AppState::RAIN:
+          state.mixer.add_source(std::make_unique<PinkNoiseGenerator>());
+          std::cout << "Switched to: Rain Storm" << std::endl;
+          break;
+        case AppState::QUIT:
+          break;
+        }
       }
     }
 
-    if (current_mode == PlayMode::RAIN)
+    if (current_mode == AppState::RAIN)
     {
       --loops_until_next_drop;
 

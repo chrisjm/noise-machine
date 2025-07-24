@@ -1,36 +1,37 @@
-CXX = clang++
+# Makefile for managing the CMake project.
+# This file acts as a wrapper for CMake commands.
 
-# C++17 standard, enable all warnings.
-CXXFLAGS = -std=c++17 -Wall -Iinclude
+# The directory where CMake will configure and build the project.
+BUILD_DIR = build
 
-LDFLAGS = -framework CoreAudio -pthread
+# The name of the final executable target as defined in your CMakeLists.txt.
+TARGET_NAME = noise_machine
 
-SRC_DIR = src
-OBJ_DIR = obj
-BIN_DIR = bin
+# --- Primary Targets ---
 
-TARGET = $(BIN_DIR)/noise_machine
-SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
-OBJECTS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
+# The default target, executed when you just run `make`.
+all: build
 
-all: $(TARGET)
+# Configure the project (if needed) and compile the code.
+build:
+	@echo "--- Configuring and Building with CMake ---"
+	@cmake -S . -B $(BUILD_DIR)
+	@cmake --build $(BUILD_DIR)
 
-# Link the executable
-$(TARGET): $(OBJECTS)
-	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-# Compile source to object files
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	@mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
+# Run the executable after ensuring it's built.
 run: all
-	@$(TARGET)
+	@echo "--- Running Application ---"
+	@$(BUILD_DIR)/$(TARGET_NAME)
 
+# --- Utility Targets ---
+
+# Clean the project by removing the entire build directory.
 clean:
-	@rm -rf $(OBJ_DIR) $(BIN_DIR)
-	@echo "Project cleaned."
+	@echo "--- Cleaning Project ---"
+	@rm -rf $(BUILD_DIR)
 
-# Phony targets are not files
-.PHONY: all run clean
+# Force a clean and then rebuild the entire project.
+rebuild: clean all
+
+# Phony targets are not files and should always be executed.
+.PHONY: all build run clean rebuild
